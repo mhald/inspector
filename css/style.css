@@ -1,0 +1,43 @@
+.xmpp  {
+    width: 80%;
+    position: relative;
+    padding: 11px;
+}
+
+.count {
+    color: #393939;
+    font-family: Georgia, sans-serif;
+    font-size: 42px;
+    margin: 10px 0;
+    line-height: 1.5;
+}
+
+.send {
+    float: right;
+    margin-right: 4%;
+    position:relative;
+}
+
+.xml {
+    border: 1px #adadad solid;
+    background-color: #fff;
+    min-height: 37px;
+    word-wrap: break-word;
+    -webkit-border-radius: 2px;
+    -moz-border-radius: 2px;
+    border-radius: 2px;
+    -webkit-box-shadow: 0px 1px 1px 0px #adadad;
+    -moz-box-shadow: 0px 1px 1px 0px #adadad;
+    -shadow: 0px 1px 1px 0px #adadad;
+}
+
+.receive {
+    float:left;
+    margin-left: 4%;
+    position:relative;
+}
+
+.end {
+    clear:both;
+    height: 10px;
+}
