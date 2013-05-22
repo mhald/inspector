@@ -3,8 +3,9 @@ var http = require("http"),
     path = require("path"),
     fs = require("fs"),
     mime = require("mime"),
-    httpProxy = require('http-proxy'),
-    port = process.argv[2] || 8888;
+    config = require('./config');
+
+var port = process.argv[2] || config.port;
  
 http.createServer(function(request, response) {
  
@@ -13,11 +14,6 @@ http.createServer(function(request, response) {
   
   path.exists(filename, function(exists) {
     if (!exists) {
-      console.log("Doesn't exist: %j", request.url);
-      if (request.url.startsWith('/packets')) {
-          console.log("Going to proxy the request");
-      }
-
       response.writeHead(404, {"Content-Type": "text/plain"});
       response.write("404 Not Found\n");
       response.end();
@@ -44,5 +40,5 @@ http.createServer(function(request, response) {
 console.log("Static file server running at\n  => http://localhost:" + port + "/\nCTRL + C to shutdown");
 
 String.prototype.startsWith = function(prefix) {
-        return this.indexOf(prefix) === 0;
+    return this.indexOf(prefix) === 0;
 }
