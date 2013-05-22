@@ -1,0 +1,13 @@
+{   "name" : "packet_inspector",
+    "version" : "0.0.1",
+    "description" : "Packet trace tool",
+    "author": "Martin Hald <martin@tigertext.com>",
+    "main": "./server.js",
+    "repository": {
+        "type": "git",
+        "url": "http://github.com/mhald/inspector.git"
+    },
+    "dependencies": {
+        "mime": "git://github.com/broofa/node-mime.git"
+   }
+}
