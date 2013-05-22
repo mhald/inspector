@@ -72,66 +72,138 @@ function get_iq_id(data) {
     return id;
 }
 
-    function xml_to_string(xml_node)
-    {
-        if (xml_node.xml)
-            return xml_node.xml;
-        else if (XMLSerializer)
-        {
-            var xml_serializer = new XMLSerializer();
-            return xml_serializer.serializeToString(xml_node);
-        }
-        else
-        {
-            alert("ERROR: Extremely old browser");
-            return "";
-        }
+function xml_to_string(xml_node) {
+    if (xml_node.xml)
+        return xml_node.xml;
+    else if (XMLSerializer) {
+        var xml_serializer = new XMLSerializer();
+        return xml_serializer.serializeToString(xml_node);
+    } else {
+        alert("ERROR: Extremely old browser");
+        return "";
     }
+}
 
-  $(document).ready(
-    function() {
-      var parts = window.location.href.split("/");
-      var token = parts[parts.length-1];
-      $('#foo').html(token);
-      if (!!window.EventSource) {
-         var source = new EventSource('/stream/'+token);
-         source.onopen = function () {
-           console.log("SSE opened");
-         };
-         source.onerror = function () {
-           console.log("SSE error!");
-         };
-         source.onmessage = function (event) {
-            var text = event.data;
-            var json = JSON.parse(event.data);
-            if (json.server == 'receive') {
-              //var id = get_iq_id(json.data);
-              //times[id] = new Date(json.timestamp);
-              $('#received').html(parseInt($('#received').html())+1);
-              $('#timeline').append(block(json.server, json.timestamp, json.data));
+$(document).ready(
+  function() {
+    var parts = window.location.href.split("/");
+    var token = parts[parts.length-1];
+    if (!!window.EventSource) {
+       var source = new EventSource('/stream/'+token);
+       source.onopen = function () {
+         console.log("SSE opened");
+       };
+       source.onerror = function () {
+         console.log("SSE error!");
+       };
+       source.onmessage = function (event) {
+          var text = event.data;
+          var traffic = JSON.parse(event.data);
+          incr(traffic.server);
+          if (traffic.type == 'xmpp' || traffic.type =='xml') {
+            $('#timeline').append(xml_block(traffic.server, traffic.timestamp, traffic.data));
+            if (traffic.server == 'receive') {
+              //var id = get_iq_id(traffic.data);
+              //times[id] = new Date(traffic.timestamp);
             }
-            if (json.server == 'send') {
-              //var id = get_iq_id(json.data);
+            if (traffic.server == 'send') {
+              //var id = get_iq_id(traffic.data);
               //var time = times[id];
-              $('#sent').html(parseInt($('#sent').html())+1);
-              $('#timeline').append(block(json.server, json.timestamp, json.data));
-              //var diffDays = new Date(json.timestamp) - time;
+              //var diffDays = new Date(traffic.timestamp) - time;
               //$('#timestamp-'+id).append("Time to answer IQ - "+diffDays+" ms");
             }
-            //$('#foo').html(token);
-         };
-      } else {
-        console.log("event source unavailable");
-        // Result to xhr polling :(
-      }
+          } else if (traffic.type == 'http') {
+              console.log("got packet "+traffic.server);
+            if (traffic.server == 'receive') {
+              $('#timeline').append(http_block('sent', traffic.url, traffic.timestamp, traffic.headers, traffic.parameters));
+            } else {
+              $('#timeline').append(http_response_block('receive', traffic.url, traffic.timestamp, traffic.code, traffic.headers, traffic.body));
+            }
+          }
+       };
+    } else {
+      console.log("event source unavailable");
+      // Result to xhr polling :(
     }
-  );
-
-  function block(direction, timestamp, data) {
-      var xml_formatted = formatXml(data);
-      var xml_escaped = xml_formatted.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/ /g, '&nbsp;').replace(/\n/g,'<br />');
-      return '<div class="'+direction+' xmpp"><div class="timestamp">'+timestamp+'</div><div class="xml">'+xml_escaped+'</div></div>';
   }
+);
+
+function incr(direction) {
+    if (direction == 'send') {
+       $('#sent').html(parseInt($('#sent').html())+1);
+    } else if (direction == 'receive') {
+       $('#received').html(parseInt($('#received').html())+1);
+    } else {
+        console.log("Invalid packet direction, got ~j, should be send or received", direction);
+    }
+}
+
+function xml_block(direction, timestamp, data) {
+    var xml_formatted = formatXml(data);
+    var xml_escaped = xml_formatted.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/ /g, '&nbsp;').replace(/\n/g,'<br />');
+    return '<div class="'+direction+' xmpp"><div class="timestamp">'+timestamp+'</div><div class="xml">'+xml_escaped+'</div></div>';
+}
+
+function http_block(direction, url, timestamp, headers_arr, parameters_arr) {
+    var headers = '';
+    var parameters = '';
+    headers = '<table>';
+    jQuery.each(headers_arr, function(index, header) {
+            headers += '<tr><td class="header_name">'+header.name+':</td>'+
+                      '<td class="header_value">'+header.value+'</td></tr>';
+    });
+    headers += '</table>';
+    parameters = '<table>';
+    jQuery.each(parameters_arr, function(index, parameter) {
+            parameters += '<tr><td class="header_name">'+parameter.name+':</td>'+
+                          '<td class="header_value">'+parameter.value+'</td></tr>';
+    });
+    parameters += '</table>';
+    return '<div class="'+direction+' http"><div class="timestamp">'+timestamp+'</div><div class="url">'+url+'</div>'+
+        '<div class="http_traffic">'+
+        '<p class="label">Headers</p>'+headers+
+        '<p class="label">Parameters</p>'+parameters+
+        '</div></div>';
+}
+
+function http_response_block(direction, url, timestamp, code, headers_arr, body) {
+    var headers = '';
+    var parameters = '';
+    headers = '<table>';
+    jQuery.each(headers_arr, function(index, header) {
+            headers += '<tr><td class="header_name">'+header.name+':</td>'+
+                      '<td class="header_value">'+header.value+'</td></tr>';
+    });
+    headers += '</table>';
+    return '<div class="'+direction+' http"><div class="timestamp">'+timestamp+'</div><div class="url">'+url+'</div>'+
+        '<div class="http_status">'+code+'</div>'+
+        '<div class="http_traffic">'+
+        '<p class="label">Headers</p>'+headers+
+        '<p class="label">Parameters</p>'+parameters+
+        '<p class="label">Body</p><pre>'+body+'</pre>'+
+        '</div></div>';
+}
+function http_block(direction, url, timestamp, headers_arr, parameters_arr) {
+    var headers = '';
+    var parameters = '';
+    headers = '<table>';
+    jQuery.each(headers_arr, function(index, header) {
+            headers += '<tr><td class="header_name">'+header.name+':</td>'+
+                      '<td class="header_value">'+header.value+'</td></tr>';
+    });
+    parameters = '<table>';
+    jQuery.each(parameters_arr, function(index, parameter) {
+            parameters += '<tr><td class="header_name">'+parameter.name+':</td>'+
+                          '<td class="header_value">'+parameter.value+'</td></tr>';
+    });
+    parameters += '</table>';
+    headers += '</table>';
+    return '<div class="'+direction+' http"><div class="timestamp">'+timestamp+'</div><div class="url">'+url+'</div>'+
+        '<div class="http_traffic">'+
+        '<p class="label">Headers</p>'+headers+
+        '<p class="label">Parameters</p>'+parameters+
+        '</div></div>';
+}
 </script>
 
 <p align="center">
