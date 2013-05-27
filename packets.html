@@ -103,14 +103,19 @@ $(document).ready(
           if (traffic.type == 'xmpp' || traffic.type =='xml') {
             $('#timeline').append(xml_block(traffic.server, traffic.timestamp, traffic.data));
             if (traffic.server == 'receive') {
-              //var id = get_iq_id(traffic.data);
-              //times[id] = new Date(traffic.timestamp);
+              var id = get_iq_id(traffic.data);
+              times[id] = new Date(traffic.timestamp);
             }
             if (traffic.server == 'send') {
-              //var id = get_iq_id(traffic.data);
-              //var time = times[id];
-              //var diffDays = new Date(traffic.timestamp) - time;
-              //$('#timestamp-'+id).append("Time to answer IQ - "+diffDays+" ms");
+              var id = get_iq_id(traffic.data);
+              if (id != undefined) {
+                console.log("IQ "+id);
+                var time = times[id];
+                if (time != undefined) {
+                  var diffDays = new Date(traffic.timestamp) - time;
+                  $('#timestamp-'+id).append(" - processing time was "+diffDays+" microseconds");
+                }
+              }
             }
           } else if (traffic.type == 'http') {
               console.log("got packet "+traffic.server);
@@ -141,7 +146,14 @@ function incr(direction) {
 function xml_block(direction, timestamp, data) {
     var xml_formatted = formatXml(data);
     var xml_escaped = xml_formatted.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/ /g, '&nbsp;').replace(/\n/g,'<br />');
-    return '<div class="'+direction+' xmpp"><div class="timestamp">'+timestamp+'</div><div class="xml">'+xml_escaped+'</div></div>';
+    var id = get_iq_id(data);
+    var divid;
+    if (id == undefined) {
+        divid = "";
+    } else {
+        divid = 'id="timestamp-'+id+'"';
+    }
+    return '<div class="'+direction+' xmpp"><div class="timestamp" '+divid+'>'+timestamp+'</div><div class="xml">'+xml_escaped+'</div></div>';
 }
 
 function http_block(direction, url, timestamp, headers_arr, parameters_arr) {
@@ -207,7 +219,16 @@ function http_block(direction, url, timestamp, headers_arr, parameters_arr) {
 </script>
 
 <p align="center">
-  <span class="count">Communication Inspector</span>
+  <span class="header">Communication Inspector</span>
+  <br/>
+  <span class="subheader">Traffic</span>
+  <br/>
+</p>
+
+<p align="center">
+  <span id="received"  class="count">0</span><span class="count" style="padding-left: 5px;">Client Sent</span>
+  <br/>
+  <span id="sent" class="count">0</span><span class="count" style="padding-left: 5px;">Server Sent</span>
   <br/>
   <span>
       <script language="javascript">
@@ -217,12 +238,6 @@ function http_block(direction, url, timestamp, headers_arr, parameters_arr) {
            //-->
       </script>
   </span>
-</p>
-
-<p align="center">
-  <span id="received"  class="count">0</span><span class="count" style="padding-left: 5px;">Client Sent</span>
-  <br/>
-  <span id="sent" class="count">0</span><span class="count" style="padding-left: 5px;">Server Sent</span>
 </p>
 
 <div id="timeline">

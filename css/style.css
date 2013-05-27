@@ -13,9 +13,29 @@
 .count {
     color: #393939;
     font-family: Georgia, sans-serif;
+    font-size: 28px;
+    margin: 10px 0;
+    line-height: 1.5;
+}
+
+.header {
+    color: #393939;
+    font-family: Georgia, sans-serif;
     font-size: 42px;
     margin: 10px 0;
     line-height: 1.5;
+}
+
+
+.subheader {
+    color: #393939;
+    font-family: Georgia, sans-serif;
+    font-size: 34px;
+    margin: 10px 0;
+}
+
+.user {
+    padding-bottom: 5px;
 }
 
 .send {
