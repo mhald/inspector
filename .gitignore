@@ -20,3 +20,4 @@ doc
 *.swp
 *.swo
 *.swn
+apps/packet_inspector
