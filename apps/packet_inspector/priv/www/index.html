@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+    <head>
+        <title>Packet Inspector</title>
+        <script src="/js/jquery.js" type="text/javascript"></script>
+        <script src="/js/moment.min.js" type="text/javascript"></script>
+        <script src="/js/livestamp.min.js" type="text/javascript"></script>
+        <!--
+        <script src="/js/jquery.timeago.js" type="text/javascript"></script>
+        -->
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" /><!-- Bootstrap -->
+        <link href="/bootstrap/3.0.0-rc1/css/bootstrap.min.css" rel="stylesheet" type="text/css" />
+        <link href="/font-awesome/css/font-awesome.css" rel="stylesheet" type="text/css" />
+        <link href="http://fonts.googleapis.com/css?family=Abel|Open+Sans:400,600" rel="stylesheet" type="text/css" /
+        ><style type="text/css">
+            pisession {
+                    position: absolute;
+                    transition: all 2s ease-in-out;
+                    -webkit-transition: all 2s ease-in-out; /** Chrome & Safari **/
+                    -moz-transition: all 2s ease-in-out; /** Firefox **/
+                    -o-transition: all 2s ease-in-out; /** Opera **/
+            }
+
+                /* http://css-tricks.com/perfect-full-page-background-image/ */
+                html {
+                        background: url(/img/6133364748_89f2365922_o.jpg) no-repeat center center fixed; 
+                        -webkit-background-size: cover;
+                        -moz-background-size: cover;
+                        -o-background-size: cover;
+                        background-size: cover;
+                }
+
+                body {
+                        padding-top: 20px;
+                        font-size: 16px;
+                        font-family: "Open Sans",serif;
+                        background: transparent;
+                }
+
+                h1 {
+                        font-family: "Abel", Arial, sans-serif;
+                        font-weight: 400;
+                        font-size: 40px;
+                }
+
+                /* Override B3 .panel adding a subtly transparent background */
+                .panel {
+                        background-color: rgba(255, 255, 255, 0.9);
+                }
+
+                .margin-base-vertical {
+                        margin: 40px 0;
+                }
+                        </style></head>
+                        <body class="PKT_ENABLED">
+
+  <div class="container">
+      <div class="row">
+          <div class="col-lg-6 col-offset-3 panel">
+              <h1 class="margin-base-vertical">Packet Inspector</h1>
+              
+              <div id="users"></div>
+
+              <div id="history">
+                   <table id="historytable" class="table table-striped table-bordered"></table>
+              </div>
+
+              <div class="margin-base-vertical">
+                  <small class="text-muted"><a href="http://www.flickr.com/photos/erwlas/6133364748/">Background picture by erwlas @flickr</a>. Used under <a href="http://creativecommons.org/licenses/by/2.0/deed.en">Creative Commons - Attribution</a>.</small></div>
+          </div><!-- //main content -->
+      </div><!-- //row -->
+  </div><!-- //container -->
+<script type="text/javascript">
+var sessions = {};
+jQuery(document).ready(function() {
+    if (!!window.EventSource) {
+       var source = new EventSource('/stream/sessions');
+       source.onopen = function () {
+         console.log("SSE opened");
+         $('#users').html('');
+       };
+       source.onerror = function () {
+         console.log("SSE error!");
+         $('#users').html('');
+       };
+       source.addEventListener('connected-users', function(event) { 
+           var json = JSON.parse(event.data);
+           var accounts = json.pi.data.accounts;
+           console.log("Got json "+event.data);
+           console.log("Got accounts "+accounts);
+           if (accounts.length == 0) {
+              $('#users').html("<p>No active sessions</p>");
+           } else {
+              $('#users').html('<table id="usertable" class="table table-striped table-bordered"></table>');
+              for (var ii=0; ii<accounts.length; ii++) {
+                 add_user(accounts[ii]);
+              }
+          }
+       });
+       source.addEventListener('2222connected-users', function(event) {
+
+          var text = event.data;
+          console.log("Sessions: "+event.data);
+//          var json = JSON.parse(event.data)
+//          if (json.session != undefined) {
+//              var packet = json.session;
+//              var action = packet.action;
+//              var users = packet.sessions;
+//    
+//              console.log("Action ", action);
+//              console.log("Users ", users);
+//              if (action == 'add') {
+//                  if (isEmpty(sessions)) {
+//                     console.log("Clearing no users notice");
+//                     $('#users').html('<table id="usertable" class="table table-striped table-bordered"></table>');
+//                  }
+//                  for (user_idx in users) {
+//                      var user = users[user_idx];
+//                      console.log("Adding user ",user);
+//                      user_details(user);
+//                      sessions[user.userid] = true;
+//                  }
+//              } else if (action == 'remove') {
+//                  for (user_idx in users) {
+//                      var user = users[user_idx];
+//                      var div = $('#'+user.userid);
+//                      if (div != undefined) {
+//                          div.remove();
+//                      }
+//                      delete sessions[user.userid];
+//                  }
+//              }
+//    
+//              // Ensure that if all users are delete we show the no active sessions
+//              if (isEmpty(sessions)) {
+//                  console.log("Re-adding no active sessions");
+//                  $('#users').html("<p>No active sessions</p>");
+//              }
+//          } else if (json.traffic != undefined) {
+//              console.log("Got traffic packet");
+//              var traffic = json.traffic;
+//              var account = traffic.account;
+//              var timestamp = time_ago(traffic.timestamp);
+//              var encoding = nice_encoding(traffic.encoding);
+//              var direction = nice_direction(traffic.direction);
+//              var row = '<tr><td>'+encoding+' '+direction+' <a href="/packets/'+account+'">'+account+'</a> at '+timestamp+'</td></tr>';
+//              $('#historytable').append(row);
+//          }
+       });
+       source.addEventListener('live-event', function(event) { 
+               event_history(event) 
+               });
+       source.addEventListener('event-history', function(event) { 
+               event_history(event) 
+               });
+    } else {
+      console.log("event source unavailable");
+      // Result to xhr polling :(
+    }
+  }
+);
+
+function event_history(event) {
+    var json = JSON.parse(event.data)
+    var account = json.pi.meta.account.name;
+    var token = json.pi.meta.account.token;
+    var timestamp = time_ago(json.pi.meta.timestamp);
+    var encoding = nice_encoding(json.pi.data.encoding);
+    var direction = nice_direction(json.pi.data.direction);
+    var row = '<tr><td>'+encoding+' '+direction+' <a href="/packets/'+token+'">'+account+'</a> '+timestamp+'</td></tr>';
+    $('#historytable').prepend(row);
+}
+
+function time_ago(ts) {
+    var rts = ts/1000000;
+    return '<span data-livestamp="'+rts+'"></span>';
+}
+
+function nice_encoding(encoding) {
+    if (encoding == 'xmpp') return 'XMPP packet';
+    if (encoding == 'http') return 'HTTP request';
+    return 'Unknown packet type';
+}
+
+function nice_direction(direction) {
+    if (direction == 'sent') return 'send to';
+    if (direction == 'received') return 'received from';
+}
+
+// for sessions - returns true if it has any entries
+function isEmpty(arr) {
+    for (var key in arr) {
+        if (arr[key]) return false; // entry values are always true
+    }
+    return true;
+}
+
+// add the user details if the user doesn't exist
+// (otherwise move the user to the top of the list)
+function add_user(user) {
+    if ($('#session_'+user.token).length == 0) {
+       row = '<tr><td id="session_'+user.token+'"><a href="/packets/'+user.token+'">'+user.name+'</a></td></tr>';
+       $('#usertable').append(row);
+    }
+}
+</script>
+</body>
+</html>
