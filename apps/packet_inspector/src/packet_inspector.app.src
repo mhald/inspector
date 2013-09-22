@@ -1,0 +1,12 @@
+{application, packet_inspector,
+ [
+  {description, "Packet Inspector"},
+  {vsn, "20110914a"},
+  {id, "packet_inspector"},
+  {registered,   []},
+  {applications, [kernel, stdlib, lager]},
+  {mod, {packet_inspector, []}},
+  {env, []}
+ ]
+}.
+
