@@ -6,7 +6,6 @@ erl_crash.dump
 *.log
 .eunit
 deps
-priv
 *.o
 *.beam
 *.plt
@@ -20,4 +19,3 @@ doc
 *.swp
 *.swo
 *.swn
-apps/packet_inspector
