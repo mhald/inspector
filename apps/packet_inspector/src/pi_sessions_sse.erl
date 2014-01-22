@@ -75,12 +75,10 @@ send_recent_traffic(Req) ->
         end || #history{data=Data} <- ets_buffer:history(history, 10)].
 
 info({'user login', Bin}, Req, State) ->
-    io:format("Got user login ~p~n", [Bin]),
     cowboy_http_req:chunk(["event: user-login\n"], Req),
     cowboy_http_req:chunk(["data:", Bin, "\n\n"], Req),
     {loop, Req, State, hibernate};
 info({'user logout', Bin}, Req, State) ->
-    io:format("Got user logout ~p~n", [Bin]),
     cowboy_http_req:chunk(["event: user-logout\n"], Req),
     cowboy_http_req:chunk(["data:", Bin, "\n\n"], Req),
     {loop, Req, State, hibernate};

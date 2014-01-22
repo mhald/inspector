@@ -52,7 +52,6 @@ handle_call(Request, Caller, State) ->
     {stop, Reason::term(), NewState::term()}.
 handle_info({tcp, _Sock, Data_Line}, #state{channels=Channels} = State) ->
     Data = binary:part(Data_Line, {0, byte_size(Data_Line)-1}),
-    io:format("Raw packet ~s~n", [Data]),
     Json = jiffy:decode(Data),
     {ok, Channels2, Server} = 
     case parse_packet(Json) of
@@ -129,7 +128,6 @@ handle_cast(Request, State) ->
 -type packet_timestamp() :: non_neg_integer().
 -spec parse_packet(term()) -> undefined | {packet_type(), packet_timestamp()}.
 parse_packet({Json}) ->
-    io:format("PArsing ~p~n", [Json]),
     case proplists:get_value(<<"pi">>, Json) of
         {Packet} ->
             case proplists:get_value(<<"meta">>, Packet) of
