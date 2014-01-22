@@ -52,6 +52,7 @@ handle_call(Request, Caller, State) ->
     {stop, Reason::term(), NewState::term()}.
 handle_info({tcp, _Sock, Data_Line}, #state{channels=Channels} = State) ->
     Data = binary:part(Data_Line, {0, byte_size(Data_Line)-1}),
+    io:format("Raw packet ~s~n", [Data]),
     Json = jiffy:decode(Data),
     {ok, Channels2, Server} = 
     case parse_packet(Json) of
@@ -85,8 +86,11 @@ handle_json(#request_metadata{type=remove_sessions}, Payload, Json, Channels) ->
 handle_json(#request_metadata{account=undefined}, Payload, _Json, Channels) ->
     lager:warning("Error, no account to broadcast on payload:~p", [Payload]),
     {ok, Channels, undefined};
-handle_json(#request_metadata{type=Req_Type, timestamp=Timestamp, account=#account{token=Account_Token}=Account}, _Payload, Json, Channels) when Req_Type =:= receive_packet; Req_Type =:= send_packet ->
-    lager:info("Registering send/recv request into history table"),
+handle_json(#request_metadata{type=Req_Type, timestamp=Timestamp,
+        account=#account{token=Account_Token}=Account}, _Payload, Json, Channels)
+        when Req_Type =:= data_packet;
+             Req_Type =:= http_request; Req_Type =:= http_response ->
+    lager:info("Registering send/recv request into history table for acct ~p", [Account]),
     ets_buffer:write(history, #history{account=Account, time=Timestamp, data=Json}),
     pubsub:publish('live event', Json),
     Channel = pubsub:account_channel(Account_Token),

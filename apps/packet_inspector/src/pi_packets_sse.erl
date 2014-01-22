@@ -9,70 +9,85 @@
 -define(HTTP_METHOD_NOT_ALLOWED, 405).
 
 -define(CHECK_TIMEOUT, 5000).
+-define(MAX_RECENT_TRAFFIC_RECORDS, 40).
 
 -record(state, {account_token          :: string(),
                 resource               :: string(),
-                is_subscribed = false  :: boolean()}).
+                handler_pid            :: pid()}).
 
 -export([init/3,
+         info/3,
          handle/2,
          terminate/2]).
 
--spec init({atom(), http}, Req, _) -> {ok, Req, #state{}}.
+-include("inspector.hrl").
+
+-spec terminate(tuple(), #state{}) -> ok.
+terminate(_Req, _State) -> ok.
+
+-spec init({atom(), http}, Req, _) -> {loop | shutdown, Req, undefined | #state{}}.
 init({_Any, http}, Req, _Opts) ->
-    {ok, Req, #state{}}.
-
--spec handle(tuple(), #state{}) -> _.
-handle(Req, State) ->
-    {Method,        Req2} = cowboy_http_req:method(Req),
-    {Account_Token, Req3} = cowboy_http_req:binding(account, Req2),
-    case {Method, Account_Token} of
-        {'GET', undefined} ->
-            lager:info("Account token missing ~p", [Req]),
-            {ok, Req4} = cowboy_http_req:reply(?HTTP_NOT_FOUND, [], <<>>, Req3),
-            {ok, Req4, State};
-        {'GET', Account_Token} ->
-            Headers = [{'Content-Type', <<"text/event-stream">>}, {<<"Access-Control-Allow-Origin">>, <<"*">>}],
-            {ok, Req4} = cowboy_http_req:chunked_reply(?HTTP_OK, Headers, Req3),
-            start_loop(Req4, State#state{account_token = binary_to_list(Account_Token)});
-        {Method, _} ->
-            lager:info("Wrong Method: ~p", [Method]),
-            {ok, Req4} = cowboy_http_req:reply(?HTTP_METHOD_NOT_ALLOWED, [], <<>>, Req3),
-            {ok, Req4, State}
+    case cowboy_http_req:method(Req) of
+        {'GET', Req0} ->
+            {Method, Req1} = cowboy_http_req:method(Req0),
+            {Account_Token, Req2} = cowboy_http_req:binding(account, Req1),
+            case {Method, Account_Token} of
+                 {'GET', undefined} ->
+                     {ok, Req3} = cowboy_http_req:reply(?HTTP_NOT_FOUND, [], <<>>, Req2),
+                     {shutdown, Req3, undefined};
+                 {'GET', Account_Token} ->
+                     Headers = [{'Content-Type', <<"text/event-stream">>}, {<<"Access-Control-Allow-Origin">>, <<"*">>}],
+                     State =  #state{account_token = binary_to_list(Account_Token), handler_pid=self()},
+                     {ok, Req3} = cowboy_http_req:chunked_reply(?HTTP_OK, Headers, Req2),
+                     Account_Channel = pubsub:account_channel(Account_Token),
+                     send_recent_traffic(Req3, Account_Token),
+                     pubsub:safe_create_channel(Account_Channel),
+                     pubsub:subscribe(Account_Channel, self()),
+                     proc_lib:spawn_link(fun() -> health_check(Req, State) end),
+                     {loop, Req3, State, infinity};
+                 {Method, _} ->
+                     lager:info("Wrong Method: ~p", [Method]),
+                     {ok, Req3} = cowboy_http_req:reply(?HTTP_METHOD_NOT_ALLOWED, [], <<>>, Req2),
+                     {shutdown, Req3, undefined}
+            end;
+        {_, Req0} ->
+            {ok, Req1} = cowboy_http_req:reply(?HTTP_METHOD_NOT_ALLOWED, [], <<>>, Req0),
+            {shutdown, Req1, undefined}
     end.
 
-start_loop(Req, State) ->
-    spawn_link(fun() -> health_check(Req, self()) end),
-    handle_loop(Req, State).
+send_recent_traffic(Req, Current_User) ->
+    [begin
+                cowboy_http_req:chunk(["event: event-history\n"], Req),
+                cowboy_http_req:chunk(["data:", Data, "\n\n"], Req)
+        end || #history{data=Data, account=#account{token=Account_Token}} <- ets_buffer:history(history, ?MAX_RECENT_TRAFFIC_RECORDS), Account_Token =:= Current_User].
 
-subscribe(Account_Token, false) when is_list(Account_Token) ->
-    Account_Channel = pubsub:account_channel(Account_Token),
-    pubsub:subscribe(Account_Channel, self()),
-    true;
-subscribe(_Account_Token, true) ->
-    true.
+-spec handle(Req, #state{}) -> {shutdown, Req, #state{}}.
+handle(Req, State) -> {shutdown, Req, State}.
 
-handle_loop(Req, #state{account_token=Account_Token, is_subscribed=Is_Subscribed} = State) ->
-    Next_Is_Subscribed = subscribe(Account_Token, Is_Subscribed),
-    NextState = State#state{is_subscribed=Next_Is_Subscribed},
-    receive
-        {cowboy_http_req, resp_sent} ->
-            handle_loop(Req, NextState);
-        {subscribed, _Channel, _Process} ->
-            %eredis_sub:ack_message(Sub),
-            handle_loop(Req, NextState);
-        {broadcast, Bin} ->
-            %eredis_sub:ack_message(Sub),
-            cowboy_http_req:chunk(["data: ", Bin, "\n\n"], Req),
-            handle_loop(Req, NextState);
-        client_disconnected ->
-            {ok, Req, NextState};
-        Event ->
-            lager:warning("Unhandled event to SSE packets: ~p", [Event]),
-            handle_loop(Req, NextState)
-    end.
+info({'user login', Bin}, Req, State) ->
+    io:format("Got user login ~p~n", [Bin]),
+    cowboy_http_req:chunk(["event: user-login\n"], Req),
+    cowboy_http_req:chunk(["data:", Bin, "\n\n"], Req),
+    {loop, Req, State, hibernate};
+info({'user logout', Bin}, Req, State) ->
+    io:format("Got user logout ~p~n", [Bin]),
+    cowboy_http_req:chunk(["event: user-logout\n"], Req),
+    cowboy_http_req:chunk(["data:", Bin, "\n\n"], Req),
+    {loop, Req, State, hibernate};
+info({'live event', Bin}, Req, State) ->
+    cowboy_http_req:chunk(["event: live-event\n"], Req),
+    cowboy_http_req:chunk(["data:", Bin, "\n\n"], Req),
+    {loop, Req, State, hibernate};
+info({cowboy_http_req, resp_sent}, Req, State) ->
+    {loop, Req, State, hibernate};
+info(client_disconnected, Req, State) ->
+    lager:info("disconnected, shutting down"),
+    {ok, Req, State};
+info(Info, Req, State) ->
+    lager:warning("Unexpected info: ~p", [Info]),
+    {loop, Req, State, hibernate}.
 
-health_check(Req, Handler_Pid) ->
+health_check(Req, #state{handler_pid=Handler_Pid} = State) ->
     process_flag(trap_exit, true),
     {ok, Transport, Socket} = cowboy_http_req:transport(Req),
     receive
@@ -80,20 +95,18 @@ health_check(Req, Handler_Pid) ->
             lager:info("~p died (~p). terminate/2 should've been called", [Handler_Pid, Reason]);
         Info ->
             lager:debug("~p received on ~p's health checker. Ignoring", [Info, Handler_Pid]),
-            health_check(Req, Handler_Pid)
+            health_check(Req, State)
     after ?CHECK_TIMEOUT ->
         case Transport:recv(Socket, 0, 0) of
             {error, timeout} -> %% Still connected
-                health_check(Req, Handler_Pid);
+                health_check(Req, State);
             {error, closed} ->
                 Handler_Pid ! client_disconnected;
             {error, ebadf} ->
                 Handler_Pid ! client_disconnected;
             SomethingElse ->
                 lager:debug("~p still connected (maybe): ~p", [Socket, SomethingElse]),
-                health_check(Req, Handler_Pid)
+                health_check(Req, State)
         end
     end.
 
--spec terminate(tuple(), #state{}) -> ok.
-terminate(_Req, _State) -> ok.

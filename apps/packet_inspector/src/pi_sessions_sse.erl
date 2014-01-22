@@ -13,40 +13,45 @@
 -record(state, {is_subscribed = false  :: boolean()}).
 
 -export([init/3,
+         info/3,
          handle/2,
          terminate/2]).
 
 -include("inspector.hrl").
 
--spec init({atom(), http}, Req, _) -> {ok, Req, #state{}}.
+-spec init({atom(), http}, Req, _) -> {loop | shutdown, Req, undefined | #state{}}.
 init({_Any, http}, Req, _Opts) ->
-    {ok, Req, #state{}}.
-
--spec handle(tuple(), #state{}) -> _.
-handle(Req, State) ->
-    {Method, Req2} = cowboy_http_req:method(Req),
-    {undefined, Req3} = cowboy_http_req:binding(account, Req2),
-    case {Method} of
-        {'GET'} ->
-            Headers = [{'Content-Type', <<"text/event-stream">>}, {<<"Access-Control-Allow-Origin">>, <<"*">>}],
-            {ok, Req4} = cowboy_http_req:chunked_reply(?HTTP_OK, Headers, Req3),
-            send_connected_users(Req4),
-            send_recent_traffic(Req4),
-            start_loop(Req4, State);
-        {Method} ->
-            lager:info("Wrong Method: ~p", [Method]),
-            {ok, Req4} = cowboy_http_req:reply(?HTTP_METHOD_NOT_ALLOWED, [], <<>>, Req3),
-            {ok, Req4, State}
+    case cowboy_http_req:method(Req) of
+        {'GET', Req0} ->
+            {Method, Req2} = cowboy_http_req:method(Req0),
+            {undefined, Req3} = cowboy_http_req:binding(account, Req2),
+            case {Method} of
+                {'GET'} ->
+                    State =  #state{},
+                    Headers = [{'Content-Type', <<"text/event-stream">>}, {<<"Access-Control-Allow-Origin">>, <<"*">>}],
+                    {ok, Req4} = cowboy_http_req:chunked_reply(?HTTP_OK, Headers, Req3),
+                    send_connected_users(Req4),
+                    send_recent_traffic(Req4),
+                    proc_lib:spawn_link(fun() -> health_check(Req, State) end),
+                    pubsub:subscribe('live event', self()),
+                    pubsub:subscribe('user login', self()),
+                    pubsub:subscribe('user logout', self()),
+                    {{_Host,Port}, Req5} = cowboy_http_req:peer(Req4),
+                    Proc_Name = list_to_atom(binary_to_list(iolist_to_binary(["homepage_sse_", integer_to_list(Port)]))),
+                    erlang:register(Proc_Name, self()),
+                    {loop, Req5, State, infinity};
+                {Method} ->
+                    lager:info("Wrong Method: ~p", [Method]),
+                    {ok, Req4} = cowboy_http_req:reply(?HTTP_METHOD_NOT_ALLOWED, [], <<>>, Req3),
+                    {shutdown, Req4, undefined}
+            end;
+        {_, Req0} ->
+            {ok, Req1} = cowboy_http_req:reply(?HTTP_METHOD_NOT_ALLOWED, [], <<>>, Req0),
+            {shutdown, Req1, undefined}
     end.
 
-start_loop(Req, State) ->
-    spawn_link(fun() -> health_check(Req, self()) end),
-    handle_loop(Req, State).
-
-subscribe() ->
-    pubsub:subscribe('live event', self()),
-    pubsub:subscribe('user login', self()),
-    pubsub:subscribe('user logout', self()).
+-spec handle(Req, #state{}) -> {shutdown, Req, #state{}}.
+handle(Req, State) -> {shutdown, Req, State}.
 
 send_connected_users(Req) ->
     Accounts = pi_sessions:get_sessions(),
@@ -55,7 +60,6 @@ send_connected_users(Req) ->
         {<<"server">>, list_to_binary(atom_to_list(node()))},
         {<<"accounts">>, Accounts_Data}
     ]),
-lager:info("Sending connected users ~p", [Text]),
     cowboy_http_req:chunk(["event: connected-users\n"], Req),
     cowboy_http_req:chunk(["data: ", Text, "\n\n"], Req).
 
@@ -70,39 +74,28 @@ send_recent_traffic(Req) ->
                 cowboy_http_req:chunk(["data:", Data, "\n\n"], Req) 
         end || #history{data=Data} <- ets_buffer:history(history, 10)].
 
-handle_loop(Req, #state{is_subscribed=Is_Subscribed} = State) ->
-    Next_Is_Subscribed = case Is_Subscribed of
-        false -> subscribe(), true;
-        true -> true
-    end,
-    NextState = State#state{is_subscribed=Next_Is_Subscribed},
-    receive
-        {cowboy_http_req, resp_sent} ->
-            handle_loop(Req, NextState);
-        {subscribed, _Channel, _Process} ->
-            handle_loop(Req, NextState);
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%
-        %% Start pubsub handlers %%
-        {'user login', Bin} ->
-            cowboy_http_req:chunk(["event: login-user\n"], Req),
-            cowboy_http_req:chunk(["data:", Bin, "\n\n"], Req),
-            handle_loop(Req, NextState);
-        {'user logout', Bin} ->
-            cowboy_http_req:chunk(["event: logout-user\n"], Req),
-            cowboy_http_req:chunk(["data:", Bin, "\n\n"], Req),
-            handle_loop(Req, NextState);
-        {'live event', Bin} ->
-            cowboy_http_req:chunk(["event: live-event\n"], Req),
-            cowboy_http_req:chunk(["data:", Bin, "\n\n"], Req),
-            handle_loop(Req, NextState);
-        %% End pubsub handlers %%
-        %%%%%%%%%%%%%%%%%%%%%%%%%
-        client_disconnected ->
-            {ok, Req, NextState};
-        Event ->
-            lager:warning("Unhandled event to SSE packets: ~p", [Event]),
-            handle_loop(Req, NextState)
-    end.
+info({'user login', Bin}, Req, State) ->
+    io:format("Got user login ~p~n", [Bin]),
+    cowboy_http_req:chunk(["event: user-login\n"], Req),
+    cowboy_http_req:chunk(["data:", Bin, "\n\n"], Req),
+    {loop, Req, State, hibernate};
+info({'user logout', Bin}, Req, State) ->
+    io:format("Got user logout ~p~n", [Bin]),
+    cowboy_http_req:chunk(["event: user-logout\n"], Req),
+    cowboy_http_req:chunk(["data:", Bin, "\n\n"], Req),
+    {loop, Req, State, hibernate};
+info({'live event', Bin}, Req, State) ->
+    cowboy_http_req:chunk(["event: live-event\n"], Req),
+    cowboy_http_req:chunk(["data:", Bin, "\n\n"], Req),
+    {loop, Req, State, hibernate};
+info({cowboy_http_req, resp_sent}, Req, State) ->
+    {loop, Req, State, hibernate};
+info(client_disconnected, Req, State) ->
+    lager:info("disconnected, shutting down"),
+    {ok, Req, State};
+info(Info, Req, State) ->
+    lager:warning("Unexpected info: ~p", [Info]),
+    {loop, Req, State, hibernate}.
 
 health_check(Req, Handler_Pid) ->
     process_flag(trap_exit, true),

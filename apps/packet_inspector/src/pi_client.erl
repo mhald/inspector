@@ -156,7 +156,7 @@ avatar(Link) -> {<<"avatar">>, as_binary(Link)}.
     {next_state, NextStateName::atom(), NewState::term()} |
     {stop, Reason::term(), NewState::term()}.
 connected({send_packet, Account, Text}, #state{socket=Socket, queue=[]} = State) ->
-    Json = pi_util:standard_pi_account_packet(<<"receive_packet">>, Account, [
+    Json = standard_pi_account_packet(<<"receive_packet">>, Account, [
             {<<"direction">>, <<"received">>},
             {<<"encoding">>, <<"xmpp">>},
             {<<"data">>, list_to_binary(Text)}
@@ -164,7 +164,7 @@ connected({send_packet, Account, Text}, #state{socket=Socket, queue=[]} = State)
     ok = gen_tcp:send(Socket, [Json, $\n]),
     {next_state, connected, State};
 connected({received_packet, Account, Text}, #state{socket=Socket, queue=[]} = State) ->
-    Json = pi_util:standard_pi_account_packet(<<"receive_packet">>, Account, [
+    Json = standard_pi_account_packet(<<"receive_packet">>, Account, [
             {<<"direction">>, <<"received">>},
             {<<"encoding">>, <<"xmpp">>},
             {<<"data">>, list_to_binary(Text)}
@@ -176,7 +176,7 @@ connected({add_sessions, Accounts}, #state{socket=Socket} = State) ->
     Text = pi_util:standard_pi_general_packet(<<"add_sessions">>, [
             {<<"server">>, list_to_binary(atom_to_list(node()))},
             {<<"accounts">>, Accounts_Data}
-        ], State),
+        ]),
     ok = gen_tcp:send(Socket, [Text, $\n]),
     {next_state, connected, State#state{}};
 connected({remove_sessions, Accounts}, #state{socket=Socket} = State) ->
@@ -184,7 +184,7 @@ connected({remove_sessions, Accounts}, #state{socket=Socket} = State) ->
     Text = pi_util:standard_pi_general_packet(<<"remove_sessions">>, [
             {<<"server">>, list_to_binary(atom_to_list(node()))},
             {<<"accounts">>, Accounts_Data}
-        ], State),
+        ]),
     ok = gen_tcp:send(Socket, [Text, $\n]),
     {next_state, connected, State#state{}}.
 

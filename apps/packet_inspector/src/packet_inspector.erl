@@ -18,7 +18,6 @@
 %% @doc Starts the application
 -spec start() -> ok | {error, {already_started, ?MODULE}}.
 start() ->
-  io:format("Starting cowboy~n"),
 	application:start(cowboy),
 	application:start(?MODULE).
 
@@ -32,7 +31,7 @@ stop() -> application:stop(?MODULE).
 %% @private
 -spec start(any(), any()) -> {ok, pid()}.
 start(_StartType, _StartArgs) ->
-    ets_buffer:create(history, ring, 50),
+    ets_buffer:create(history, ring, 200),
     pi_sup:start_link().
 
 %% @private

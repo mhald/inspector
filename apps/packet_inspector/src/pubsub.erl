@@ -108,7 +108,7 @@ handle_cast({subscribe, Channel, Process}, State) ->
     {noreply, State};
 
 handle_cast({publish, Channel, Message}, State) ->
-    lager:info("Publishing message to ~p", [Channel]),
+    lager:info("Publishing message to ~p ~p", [Channel, Message]),
     broadcast(Channel, Message, ets:tab2list(channel_name(Channel))),
     {noreply, State};
 
@@ -170,8 +170,13 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
+broadcast(Channel, _Message, []) ->
+    lager:info("No listeners for channel ~p", [Channel]);
 broadcast(Channel, Message, Listeners) ->
-    [Listener ! {Channel, Message} || {Listener} <- Listeners].
+    [begin
+                lager:info("Sending message to ~p", [Listener]),
+                Listener ! {Channel, Message} 
+     end || {Listener} <- Listeners].
 
 channel_name(Channel) ->
     list_to_atom("pubsub_"++atom_to_list(Channel)).

@@ -25,11 +25,10 @@ start_link() ->
 -spec init([]) -> {ok, {{one_for_one, 5, 60}, [supervisor:child_spec()]}}.
 init([]) ->
   {ok, {{one_for_one, 5, 60}, [
-	{pi_web, {pi_web, start_link, []}, permanent, 2000, worker, [pi_web]},
 	{pi_clock, {pi_clock, start_link, []}, permanent, 2000, worker, [pi_clock]},
+	{pi_sessions, {pi_sessions, start_link, []}, permanent, 2000, worker, [pi_sessions]},
+	{pi_web, {pi_web, start_link, []}, permanent, 2000, worker, [pi_web]},
 	{pi_connection_sup, {pi_connection_sup, start_link, []}, permanent, 2000, supervisor, [pi_connection_sup]},
 	{pi_listener, {pi_listener, start_link, []}, permanent, 2000, worker, [pi_listener]},
-	{pi_sessions, {pi_sessions, start_link, []}, permanent, 2000, worker, [pi_sessions]},
-	{pi_client, {pi_client, start_link, []}, permanent, 2000, worker, [pi_client]},
 	{pubsub, {pubsub, start_link, []}, permanent, 2000, worker, [pubsub]}
   ]}}.
