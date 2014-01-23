@@ -19,4 +19,4 @@ doc
 *.swp
 *.swo
 *.swn
-rel
+rel/inspector
