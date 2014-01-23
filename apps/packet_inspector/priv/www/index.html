@@ -184,7 +184,7 @@ function time_ago(ts) {
 function nice_encoding(encoding) {
     if (encoding == 'xmpp') return 'XMPP packet';
     if (encoding == 'http') return 'HTTP request';
-    return 'Unknown packet type';
+    return encoding;
 }
 
 function nice_direction(direction) {
