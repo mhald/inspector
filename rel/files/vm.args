@@ -1,7 +1,7 @@
 ## Name of the node, must be included in the local autocomplete.cfg file in order for the
 ## server to load its dataset and become available as part of a consumer or pro serach
 ## cluster
--name packet_insecptor@127.0.0.1
+-name inspector@127.0.0.1
 
 ## Cookie for distributed erlang
 -setcookie 51C4A202-BD37-4DD0-9300-D2A46FBDECAD

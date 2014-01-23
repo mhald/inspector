@@ -1,4 +1,4 @@
--module(pi_web).
+-module(pi_web_services).
 -author('mhald@mac.com').
 
 -export([start_link/0]).
@@ -6,12 +6,12 @@
 %%
 %% API Functions
 %%
--define(DEFAULT_PORT, 9006).
+-define(DEFAULT_PORT, 9007).
 
 -spec start_link() -> {ok,pid()}.
 start_link() ->
   Port = config:get_env(http_port, ?DEFAULT_PORT),
-  StaticOptions = [{directory, {priv_dir, packet_inspector, [<<"www">>]}},
+  StaticOptions = [{directory, {priv_dir, inspector, [<<"www">>]}},
       {etag, {attributes, [filepath, filesize, inode, mtime]}},
       {mimetypes, {fun mimetypes:path_to_mimes/2, default}}],
   Dispatch = [
@@ -31,5 +31,4 @@ start_link() ->
   %% Name, NbAcceptors, Transport, TransOpts, Protocol, ProtoOpts
   cowboy:start_listener(packet_inspector_listener, 100,
                         cowboy_tcp_transport, [{port, Port}],
-                        cowboy_http_protocol, [{dispatch, Dispatch}]
-                       ).
+                        cowboy_http_protocol, [{dispatch, Dispatch}]).

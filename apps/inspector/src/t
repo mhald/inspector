@@ -1,0 +1,4 @@
+ets_buffer:create(test, ring, 5).
+ets_buffer:write(test, {test1}).
+ets_buffer:history(test). % gets the oldest first [oldest ... newest]
+

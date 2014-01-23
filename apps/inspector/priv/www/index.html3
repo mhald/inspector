@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Sessions</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="/js/jquery.js"></script>
+  <!--<link rel="stylesheet" href="/css/style.css">-->
+
+  <!-- Bootstrap -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/font-awesome/css/font-awesome.css" rel="stylesheet" />
+
+  <!--
+  <link href="http://fonts.googleapis.com/css?family=Abel|Open+Sans:400,600" rel="stylesheet" />
+  -->
+
+  <style>
+
+      /* http://css-tricks.com/perfect-full-page-background-image/ */
+      html {
+          background: url(/img/1339301416891.jpg) no-repeat center center fixed;
+          -webkit-background-size: cover;
+          -moz-background-size: cover;
+          -o-background-size: cover;
+          background-size: cover;
+      }
+
+      body {
+          padding-top: 20px;
+          font-size: 16px;
+          font-family: "Open Sans",serif;
+          background: transparent;
+      }
+
+      h1 {
+          font-family: "Abel", Arial, sans-serif;
+          font-weight: 400;
+          font-size: 40px;
+      }
+
+      /* Override B3 .panel adding a subtly transparent background */
+      .panel {
+          background-color: rgba(255, 255, 255, 0.9);
+      }
+
+      .margin-base-vertical {
+          margin: 40px 0;
+      }
+
+  </style>
+
+</head>
+<body>
+
+  <div class="container">
+      <div class="row">
+          <div class="col-lg-6 col-offset-3 panel">
+              <h1 class="margin-base-vertical">Communication Inspector: Session</h1>
+              
+              <div id="users">
+              </div>
+
+              <div class="margin-base-vertical">
+                  <small class="text-muted"><a href="http://www.flickr.com/photos/erwlas/6133364748/">Background picture by erwlas @flickr</a>. Used under <a href="http://creativecommons.org/licenses/by/2.0/deed.en">Creative Commons - Attribution</a>.</small>
+              </div>
+
+          </div><!-- //main content -->
+      </div><!-- //row -->
+  </div> <!-- //container -->
+
+<script type="text/javascript">
+$(document).ready(
+  function() {
+    if (!!window.EventSource) {
+       var source = new EventSource('/stream/sessions');
+       source.onopen = function () {
+         console.log("SSE opened");
+         $('#users').html('');
+       };
+       source.onerror = function () {
+         console.log("SSE error!");
+       };
+       source.onmessage = function (event) {
+          var text = event.data;
+          console.log("Event: "+event.data);
+          var sessions = JSON.parse(event.data);
+          var packet = sessions.session;
+          var action = packet.action;
+          var users = packet.sessions;
+          console.log("Users ",users);
+          if (action == 'add') {
+              for (user_idx in users) {
+                 $('#users').append(user_details(users[user_idx]));
+              }
+          } else {
+              $('#'+user.token).remove();
+          }
+       };
+    } else {
+      console.log("event source unavailable");
+      // Result to xhr polling :(
+    }
+  }
+);
+
+function user_details(name) {
+    return '<div class="user" id="'+name+'"><a href="/packets/'+name+'">'+name+'</a></div>';
+}
+</script>
+</body>
+</html>

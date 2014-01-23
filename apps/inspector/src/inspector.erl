@@ -3,7 +3,7 @@
 %%% @doc Packet Inspector
 %%% @end
 %%%-------------------------------------------------------------------
--module(packet_inspector).
+-module(inspector).
 -author('mhald@mac.com').
 -vsn('0.1').
 
@@ -18,7 +18,6 @@
 %% @doc Starts the application
 -spec start() -> ok | {error, {already_started, ?MODULE}}.
 start() ->
-	application:start(cowboy),
 	application:start(?MODULE).
 
 %% @doc Stops the application
@@ -31,7 +30,6 @@ stop() -> application:stop(?MODULE).
 %% @private
 -spec start(any(), any()) -> {ok, pid()}.
 start(_StartType, _StartArgs) ->
-    ets_buffer:create(history, ring, 200),
     pi_sup:start_link().
 
 %% @private

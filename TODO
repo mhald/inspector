@@ -1,0 +1,14 @@
+Use a tcp socket for connected users, rules are:
+  - Once connected sever will send list of connected users
+  - If the socket drops "packet inspector" will erase all users listed from that server
+  - allow packets to be sent through the port as well (instead of redis)
+
+protocol
+
+412{payload:"user_list", users:[{name:"martin"}]}
+321{payload:"user_add", user:{name:"martin"}}
+120{payload:"http_req", JSON}
+121{payload:"http_res", JSON}
+126{payload:"xmpp_req", JSON}
+
+

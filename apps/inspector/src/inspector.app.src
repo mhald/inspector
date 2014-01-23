@@ -1,11 +1,12 @@
-{application, packet_inspector,
+{application, inspector,
  [
   {description, "Packet Inspector"},
   {vsn, "20110914a"},
-  {id, "packet_inspector"},
+  {id, "inspector"},
   {registered,   []},
+  {included_applications, [cowboy]},
   {applications, [kernel, stdlib, lager]},
-  {mod, {packet_inspector, []}},
+  {mod, {inspector, []}},
   {env, []}
  ]
 }.

@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+    <head>
+        <title>Packet Inspector: Sessions</title>
+        <script src="/js/jquery.js"></script>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" /><!-- Bootstrap -->
+        <link href="/bootstrap/3.0.0-rc1/css/bootstrap.min.css" rel="stylesheet" type="text/css" />
+        <link href="/font-awesome/css/font-awesome.css" rel="stylesheet" type="text/css" />
+        <link href="http://fonts.googleapis.com/css?family=Abel|Open+Sans:400,600" rel="stylesheet" type="text/css" /
+        ><style type="text/css">
+            pisession {
+                    position: absolute;
+                    transition: all 2s ease-in-out;
+                    -webkit-transition: all 2s ease-in-out; /** Chrome & Safari **/
+                    -moz-transition: all 2s ease-in-out; /** Firefox **/
+                    -o-transition: all 2s ease-in-out; /** Opera **/
+            }
+
+                /* http://css-tricks.com/perfect-full-page-background-image/ */
+                html {
+                        background: url(/img/6133364748_89f2365922_o.jpg) no-repeat center center fixed; 
+                        -webkit-background-size: cover;
+                        -moz-background-size: cover;
+                        -o-background-size: cover;
+                        background-size: cover;
+                }
+
+                body {
+                        padding-top: 20px;
+                        font-size: 16px;
+                        font-family: "Open Sans",serif;
+                        background: transparent;
+                }
+
+                h1 {
+                        font-family: "Abel", Arial, sans-serif;
+                        font-weight: 400;
+                        font-size: 40px;
+                }
+
+                /* Override B3 .panel adding a subtly transparent background */
+                .panel {
+                        background-color: rgba(255, 255, 255, 0.9);
+                }
+
+                .margin-base-vertical {
+                        margin: 40px 0;
+                }
+                        </style></head>
+                        <body class="PKT_ENABLED">
+
+  <div class="container">
+      <div class="row">
+          <div class="col-lg-6 col-offset-3 panel">
+              <h1 class="margin-base-vertical" style="margin-bottom:0px;">Packet Stream</h1>
+              <p><a href="/">Back to sessions</a></p>
+              
+              <!--
+    <div class="row">
+        <div class="span">
+            <h2><span id="received">0</span> Client Sent</h2>
+           <h2><span id="sent">0</span> Server Sent</h2>
+        </div>
+   </div>
+   -->
+
+   <div id="timeline">
+   </div>
+
+              <div class="margin-base-vertical">
+                  <small class="text-muted"><a href="http://www.flickr.com/photos/erwlas/6133364748/">Background picture by erwlas @flickr</a>. Used under <a href="http://creativecommons.org/licenses/by/2.0/deed.en">Creative Commons - Attribution</a>.</small></div>
+          </div><!-- //main content -->
+      </div><!-- //row -->
+  </div><!-- //container -->
+<script type="text/javascript">
+
+var times = {};
+var req_counter = 0;
+var req_database = [];
+
+function formatXml(xml) {
+    var formatted = '';
+    var reg = /(>)(<)(\/*)/g;
+    xml = xml.replace(reg, '$1\r\n$2$3');
+    var pad = 0;
+    jQuery.each(xml.split('\r\n'), function(index, node) {
+        var indent = 0;
+        if (node.match( /.+<\/\w[^>]*>$/ )) {
+            indent = 0;
+        } else if (node.match( /^<\/\w/ )) {
+            if (pad != 0) {
+                pad -= 1;
+            }
+        } else if (node.match( /^<\w[^>]*[^\/]>.*$/ )) {
+            indent = 1;
+        } else {
+            indent = 0;
+        }
+ 
+        var padding = '';
+        for (var i = 0; i < pad; i++) {
+            padding += '  ';
+        }
+ 
+        formatted += padding + node + '\r\n';
+        pad += indent;
+    });
+ 
+    return formatted;
+}
+ 
+$.extend({
+  getUrlVars: function(){
+    var vars = [], hash;
+    var hashes = window.location.href.slice(window.location.href.indexOf('?') + 1).split('&');
+    for(var i = 0; i < hashes.length; i++)
+    {
+      hash = hashes[i].split('=');
+      vars.push(hash[0]);
+      vars[hash[0]] = hash[1];
+    }
+    return vars;
+  },
+  getUrlVar: function(name){
+    return $.getUrlVars()[name];
+  }
+});
+
+function getURLParameter(name) {
+   return decodeURI((RegExp(name + '=' + '(.+?)(&|$)').exec(location.search)||[,null])[1]);
+}
+
+function get_iq_id(data) {
+    var xmlDoc = $.parseXML(data);
+    $xml = $(xmlDoc);
+    $title = $xml.find("iq");
+    var id=$title.attr("id");
+    return id;
+}
+
+function xml_to_string(xml_node) {
+    if (xml_node.xml)
+        return xml_node.xml;
+    else if (XMLSerializer) {
+        var xml_serializer = new XMLSerializer();
+        return xml_serializer.serializeToString(xml_node);
+    } else {
+        alert("ERROR: Extremely old browser");
+        return "";
+    }
+}
+
+$(document).ready(
+  function() {
+    var parts = window.location.href.split("/");
+    var token = parts[parts.length-1];
+    if (!!window.EventSource) {
+       var subscribe_uri='/stream/packets/'+token;
+       console.log("subscribing to "+subscribe_uri);
+       var source = new EventSource(subscribe_uri);
+       source.onopen = function () {
+         console.log("SSE opened");
+       };
+       source.onerror = function () {
+         console.log("SSE error!");
+       };
+       source.onmessage = function (event) {
+          var text = event.data;
+          console.log("Got traffic ",text);
+          var packet = JSON.parse(event.data);
+          var traffic = packet.traffic;
+          req_counter++;
+          packet.counter = req_counter;
+          req_database[req_counter] = packet;
+          incr(traffic.direction);
+          if (traffic.encoding == 'xmpp' || traffic.encoding =='xml') {
+            $('#timeline').append(xml_block(traffic.direction, traffic.timestamp, traffic.data));
+            if (traffic.direction == 'received') {
+              var id = get_iq_id(traffic.data);
+              times[id] = new Date(traffic.timestamp);
+            }
+            if (traffic.direction == 'sent') {
+              var id = get_iq_id(traffic.data);
+              if (id != undefined) {
+                console.log("IQ "+id);
+                var time = times[id];
+                if (time != undefined) {
+                  var diffDays = new Date(traffic.timestamp) - time;
+                  $('#timestamp-'+id).append(" - processing time was "+diffDays+" microseconds");
+                }
+              }
+            }
+          } else if (traffic.encoding == 'http') {
+              console.log("got packet "+traffic.direction);
+            if (traffic.direction == 'received') {
+              $('#timeline').append(http_block('sent', traffic.url, traffic.timestamp, traffic.headers, traffic.parameters));
+            } else {
+              $('#timeline').append(http_response_block('received', traffic.url, traffic.timestamp, traffic.code, traffic.headers, traffic.body));
+            }
+          }
+       };
+    } else {
+      console.log("event source unavailable");
+      // Result to xhr polling :(
+    }
+  }
+);
+
+function incr(direction) {
+    if (direction == 'sent') {
+       $('#sent').html(parseInt($('#sent').html())+1);
+    } else if (direction == 'received') {
+       $('#received').html(parseInt($('#received').html())+1);
+    } else {
+        console.log("Invalid packet direction, got ", direction, " should be sent or received");
+    }
+}
+
+function xml_block(direction, timestamp, data) {
+    var xml_formatted = formatXml(data);
+    var xml_escaped = xml_formatted.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/ /g, '&nbsp;').replace(/\n/g,'<br />');
+    var id = get_iq_id(data);
+    var divid;
+    if (id == undefined) {
+        divid = "";
+    } else {
+        divid = 'id="timestamp-'+id+'"';
+    }
+    return '<div class="'+direction+' xmpp"><div class="timestamp" '+divid+'>'+timestamp+' '+direction+'</div><div class="xml">'+xml_escaped+'</div></div>';
+}
+
+function http_block(direction, url, timestamp, headers_arr, parameters_arr) {
+    var headers = '';
+    var parameters = '';
+    headers = '<table>';
+    jQuery.each(headers_arr, function(index, header) {
+            headers += '<tr><td class="header_name">'+header.name+':</td>'+
+                      '<td class="header_value">'+header.value+'</td></tr>';
+    });
+    headers += '</table>';
+    parameters = '<table>';
+    jQuery.each(parameters_arr, function(index, parameter) {
+            parameters += '<tr><td class="header_name">'+parameter.name+':</td>'+
+                          '<td class="header_value">'+parameter.value+'</td></tr>';
+    });
+    parameters += '</table>';
+    return '<div class="'+direction+' http"><div class="timestamp">'+timestamp+'</div><div class="url">'+url+'</div>'+
+        '<div class="http_traffic">'+
+        '<p class="label">Headers</p>'+headers+
+        '<p class="label">Parameters</p>'+parameters+
+        '</div></div>';
+}
+
+function http_response_block(direction, url, timestamp, code, headers_arr, body) {
+    var headers = '';
+    var parameters = '';
+    headers = '<table>';
+    jQuery.each(headers_arr, function(index, header) {
+            headers += '<tr><td class="header_name">'+header.name+':</td>'+
+                      '<td class="header_value">'+header.value+'</td></tr>';
+    });
+    headers += '</table>';
+    return '<div class="'+direction+' http"><div class="timestamp">'+timestamp+'</div><div class="url">'+url+'</div>'+
+        '<div class="http_status">'+code+'</div>'+
+        '<div class="http_traffic">'+
+        '<p class="label">Headers</p>'+headers+
+        '<p class="label">Parameters</p>'+parameters+
+        '<p class="label">Body</p><pre>'+body+'</pre>'+
+        '</div></div>';
+}
+function http_block(direction, url, timestamp, headers_arr, parameters_arr) {
+    var headers = '';
+    var parameters = '';
+    headers = '<table>';
+    jQuery.each(headers_arr, function(index, header) {
+            headers += '<tr><td class="header_name">'+header.name+':</td>'+
+                      '<td class="header_value">'+header.value+'</td></tr>';
+    });
+    parameters = '<table>';
+    jQuery.each(parameters_arr, function(index, parameter) {
+            parameters += '<tr><td class="header_name">'+parameter.name+':</td>'+
+                          '<td class="header_value">'+parameter.value+'</td></tr>';
+    });
+    parameters += '</table>';
+    headers += '</table>';
+    return '<div class="'+direction+' http"><div class="timestamp">'+timestamp+'</div><div class="url">'+url+'</div>'+
+        '<div class="http_traffic">'+
+        '<p class="label">Headers</p>'+headers+
+        '<p class="label">Parameters</p>'+parameters+
+        '</div></div>';
+}
+</script>
+
+</body>
+</html>

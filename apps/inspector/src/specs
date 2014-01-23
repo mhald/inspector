@@ -1,0 +1,26 @@
+
+-spec start_link() -> ok.
+
+-spec init(_) -> {ok, #state{}}.
+
+-spec handle_call(Request::term(), From::{pid(), Tag::term()},
+    State::term()) ->
+    {reply, Reply::term(), NewState::term()} |
+    {reply, Reply::term(), NewState::term(), timeout() | hibernate} |
+    {noreply, NewState::term()} |
+    {noreply, NewState::term(), timeout() | hibernate} |
+    {stop, Reason::term(), Reply::term(), NewState::term()}.
+
+-spec handle_info(Info::term(), State::term()) ->
+    {noreply, NewState::term()} |
+    {noreply, NewState::term(), timeout() | hibernate} |
+    {stop, Reason::term(), NewState::term()}.
+
+-spec terminate(Reason::(normal | shutdown | {shutdown, term()} | term()), State::term()) -> ok | term().
+
+-spec code_change(OldVsn::(term() | {down, term()}), State::term(), Extra::term()) ->
+
+-spec handle_cast(Request::term(), State::term()) ->
+        {noreply, NewState :: term()} |
+        {noreply, NewState :: term(), timeout() | hibernate} |
+        {stop, Reason :: term(), NewState :: term()}.
