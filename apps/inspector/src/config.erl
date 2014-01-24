@@ -9,7 +9,7 @@
 get_env(Param) -> get_env(Param, undefined).
 
 get_env(Param, Default) ->
-    case application:get_env(packet_inspector, Param) of
+    case application:get_env(inspector, Param) of
         {ok, Val} -> Val;
         undefined -> Default
     end.
