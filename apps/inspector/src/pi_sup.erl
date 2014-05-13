@@ -24,7 +24,7 @@ start_link() ->
 %% @hidden
 -spec init([]) -> {ok, {{one_for_one, 5, 60}, [supervisor:child_spec()]}}.
 init([]) ->
-  ets_buffer:create(history, ring, 200),
+  ets_buffer:create(history, ring, 1000),
   {ok, {{one_for_one, 5, 60}, [
 	{pi_clock, {pi_clock, start_link, []}, permanent, 2000, worker, [pi_clock]},
 	{pi_sessions, {pi_sessions, start_link, []}, permanent, 2000, worker, [pi_sessions]},

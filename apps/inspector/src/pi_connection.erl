@@ -95,11 +95,11 @@ handle_json(#request_metadata{type=Req_Type, timestamp=Timestamp,
     Channel = pubsub:account_channel(Account_Token),
     Next_Channels = case proplists:is_defined(Channel, Channels) of
         true ->
-            pubsub:publish(Channel, Json),
+            pubsub:publish(Channel, 'live event', Json),
             Channels;
         _ ->
             pubsub:safe_create_channel(Channel),
-            pubsub:publish(Channel, Json),
+            pubsub:publish(Channel, 'live event', Json),
             [{Channel, true} | Channels]
     end,
     {ok, Next_Channels, undefined};

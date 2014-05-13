@@ -12,7 +12,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" /><!-- Bootstrap -->
         <link href="/bootstrap/3.0.0-rc1/css/bootstrap.min.css" rel="stylesheet" type="text/css" />
         <link href="/font-awesome/css/font-awesome.css" rel="stylesheet" type="text/css" />
-        <link href="http://fonts.googleapis.com/css?family=Abel|Open+Sans:400,600" rel="stylesheet" type="text/css" /
+        <link href="https://fonts.googleapis.com/css?family=Abel|Open+Sans:400,600" rel="stylesheet" type="text/css" /
         ><style type="text/css">
             pisession {
                     position: absolute;
@@ -75,14 +75,19 @@
   </div><!-- //container -->
 <script type="text/javascript">
 jQuery(document).ready(function() {
+    var parts = window.location.href.split("/");
+    var token = parts[parts.length-1];
+    console.log("connecting to "+token);
     if (!!window.EventSource) {
-       var source = new EventSource('/stream/sessions');
+       var source = new EventSource('/stream/packets/'+token);
+       //var source = new EventSource('/stream/sessions');
        source.onopen = function () {
          console.log("SSE opened");
        };
        source.onerror = function () {
          console.log("SSE error!");
        };
+       console.log("Using source "+source);
        source.addEventListener('live-event', function(event) { event_history(event) });
        source.addEventListener('event-history', function(event) { event_history(event) });
     } else {
@@ -128,7 +133,7 @@ function format_http_payload(json) {
     var headers = '';
     var parameters = '';
     if (headers_arr != undefined) {
-        headers = '<p>Headers</p><table>';
+        headers = '<p>Headers</p><table class="table table-condensed">';
         jQuery.each(headers_arr, function(index, header) {
             headers += '<tr><td class="header_name">'+header.name+':</td>'+
                       '<td class="header_value">'+header.value+'</td></tr>';
@@ -136,7 +141,7 @@ function format_http_payload(json) {
         headers += '</table>';
     }
     if (parameters_arr != undefined) {
-        parameters = '<p>Parameters</p><table>';
+        parameters = '<p>Parameters</p><table class="table table-condensed">';
         jQuery.each(parameters_arr, function(index, parameter) {
             parameters += '<tr><td class="header_name">'+parameter.name+':</td>'+
                           '<td class="header_value">'+parameter.value+'</td></tr>';
@@ -155,8 +160,9 @@ function format_xmpp_payload(json) {
     var xml_escaped = data;
     var xml_formatted = formatXml(data);
     //var xml_formatted = breakup(formatXml(data));
-    var xml_escaped = xml_formatted.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/ /g, '&nbsp;').replace(/\n/g,'<br />');
-    return '<tr><td class="xml"><div style="">'+xml_escaped+'<div></td></tr>';
+    //var xml_escaped = xml_formatted.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/ /g, '&nbsp;').replace(/\n/g,'<br />');
+    var xml_escaped = xml_formatted.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/(?:\n)[ ]*/g, '&nbsp;').replace(/\n/g,'<br />');
+    return '<tr><td class="xml"><div style="text-wrap:unrestricted; color:black;">'+xml_escaped+'<div></td></tr>';
 }
 
 var master = 0;

@@ -9,7 +9,7 @@
 -define(HTTP_METHOD_NOT_ALLOWED, 405).
 
 -define(CHECK_TIMEOUT, 5000).
--define(MAX_RECENT_TRAFFIC_RECORDS, 40).
+-define(MAX_RECENT_TRAFFIC_RECORDS, 100).
 
 -record(state, {account_token          :: string(),
                 resource               :: string(),

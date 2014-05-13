@@ -5,6 +5,7 @@
 %% API
 -export([start_link/0,
          publish/2,
+         publish/3,
          create_channel/1,
          safe_create_channel/1,
          account_channel/1,
@@ -26,15 +27,18 @@
 %%%===================================================================
 
 -type channel() :: atom().
+-type name()    :: atom().
 -type message() :: binary().
 
 -spec publish(channel(), message()) -> ok.
+-spec publish(channel(), name(), message()) -> ok.
 -spec create_channel(channel()) -> ok.
 -spec safe_create_channel(channel()) -> ok.
 -spec subscribe(channel(), pid()) -> ok.
 -spec account_channel(string()) -> binary().
 
 publish(Channel, Message) -> gen_server:cast(?MODULE, {publish, Channel, Message}).
+publish(Channel, Name, Message) -> gen_server:cast(?MODULE, {publish, Channel, Name, Message}).
 create_channel(Channel) -> gen_server:cast(?MODULE, {create_channel, Channel}).
 safe_create_channel(Channel) -> gen_server:cast(?MODULE, {safe_create_channel, Channel}).
 subscribe(Channel, Process) -> gen_server:cast(?MODULE, {subscribe, Channel, Process}).
@@ -110,6 +114,11 @@ handle_cast({subscribe, Channel, Process}, State) ->
 handle_cast({publish, Channel, Message}, State) ->
     lager:info("Publishing message to ~p ~p", [Channel, Message]),
     broadcast(Channel, Message, ets:tab2list(channel_name(Channel))),
+    {noreply, State};
+
+handle_cast({publish, Channel, Name, Message}, State) ->
+    lager:info("Publishing message to ~p ~p via name ~p", [Channel, Message, Name]),
+    broadcast(Name, Message, ets:tab2list(channel_name(Channel))),
     {noreply, State};
 
 %%--------------------------------------------------------------------
