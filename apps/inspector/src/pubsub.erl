@@ -9,7 +9,9 @@
          create_channel/1,
          safe_create_channel/1,
          account_channel/1,
-         subscribe/2]).
+         subscribe/2,
+         unsubscribe/2,
+         listeners/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -35,13 +37,17 @@
 -spec create_channel(channel()) -> ok.
 -spec safe_create_channel(channel()) -> ok.
 -spec subscribe(channel(), pid()) -> ok.
+-spec unsubscribe(channel(), pid()) -> ok.
 -spec account_channel(string()) -> binary().
+-spec listeners(string()) -> [any()].
 
 publish(Channel, Message) -> gen_server:cast(?MODULE, {publish, Channel, Message}).
 publish(Channel, Name, Message) -> gen_server:cast(?MODULE, {publish, Channel, Name, Message}).
 create_channel(Channel) -> gen_server:cast(?MODULE, {create_channel, Channel}).
 safe_create_channel(Channel) -> gen_server:cast(?MODULE, {safe_create_channel, Channel}).
 subscribe(Channel, Process) -> gen_server:cast(?MODULE, {subscribe, Channel, Process}).
+unsubscribe(Channel, Process) -> gen_server:cast(?MODULE, {unsubscribe, Channel, Process}).
+listeners(Channel) -> gen_server:call(?MODULE, {listeners, Channel}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -91,6 +97,16 @@ init([]) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec handle_call(term(), pid(), term()) -> {reply, ok, #state{}}.
+
+handle_call({listeners, Tab}, _From, State) ->
+    Reply = case ets:info(Tab) of
+        undefined ->
+            [];
+        _ ->
+            ets:tab2list(Tab)
+    end,
+    {reply, Reply, State};
+
 handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
@@ -108,7 +124,13 @@ handle_cast({safe_create_channel, Channel}, State) ->
     {noreply, State};
 
 handle_cast({subscribe, Channel, Process}, State) ->
+    lager:debug("subscribing ~p to ~p", [Process, Channel]),
     ets:insert(channel_name(Channel), {Process}),
+    {noreply, State};
+
+handle_cast({unsubscribe, Channel, Process}, State) ->
+    lager:debug("unsubscribing ~p from ~p", [Process, Channel]),
+    ets:delete(channel_name(Channel), Process),
     {noreply, State};
 
 handle_cast({publish, Channel, Message}, State) ->

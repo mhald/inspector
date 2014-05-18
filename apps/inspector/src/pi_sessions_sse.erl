@@ -7,8 +7,10 @@
 -define(HTTP_NO_RESPONSE, 204).
 -define(HTTP_NOT_FOUND, 404).
 -define(HTTP_METHOD_NOT_ALLOWED, 405).
-
 -define(CHECK_TIMEOUT, 5000).
+-define(LIVE_EVENT, 'live event').
+-define(USER_LOGIN, 'user login').
+-define(USER_LOGOUT, 'user logout').
 
 -record(state, {is_subscribed = false  :: boolean()}).
 
@@ -32,10 +34,11 @@ init({_Any, http}, Req, _Opts) ->
                     {ok, Req4} = cowboy_http_req:chunked_reply(?HTTP_OK, Headers, Req3),
                     send_connected_users(Req4),
                     send_recent_traffic(Req4),
-                    proc_lib:spawn_link(fun() -> health_check(Req, State) end),
-                    pubsub:subscribe('live event', self()),
-                    pubsub:subscribe('user login', self()),
-                    pubsub:subscribe('user logout', self()),
+                    Handler = self(),
+                    proc_lib:spawn_link(fun() -> health_check(Req, Handler) end),
+                    pubsub:subscribe(?LIVE_EVENT, self()),
+                    pubsub:subscribe(?USER_LOGIN, self()),
+                    pubsub:subscribe(?USER_LOGOUT, self()),
                     {{_Host,Port}, Req5} = cowboy_http_req:peer(Req4),
                     Proc_Name = list_to_atom(binary_to_list(iolist_to_binary(["homepage_sse_", integer_to_list(Port)]))),
                     erlang:register(Proc_Name, self()),
@@ -89,7 +92,7 @@ info({'live event', Bin}, Req, State) ->
 info({cowboy_http_req, resp_sent}, Req, State) ->
     {loop, Req, State, hibernate};
 info(client_disconnected, Req, State) ->
-    lager:info("disconnected, shutting down"),
+    lager:info("sessions sse disconnected, shutting down"),
     {ok, Req, State};
 info(Info, Req, State) ->
     lager:warning("Unexpected info: ~p", [Info]),
@@ -119,4 +122,8 @@ health_check(Req, Handler_Pid) ->
     end.
 
 -spec terminate(tuple(), #state{}) -> ok.
-terminate(_Req, _State) -> ok.
+terminate(_Req, _State) ->
+    pubsub:unsubscribe(?LIVE_EVENT, self()),
+    pubsub:unsubscribe(?USER_LOGIN, self()),
+    pubsub:unsubscribe(?USER_LOGOUT, self()),
+    ok.

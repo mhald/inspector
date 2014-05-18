@@ -23,7 +23,11 @@
 -include("inspector.hrl").
 
 -spec terminate(tuple(), #state{}) -> ok.
-terminate(_Req, _State) -> ok.
+terminate(_Req, #state{account_token=Account_Token} = _State) ->
+    lager:info("removing registered listener"),
+    Account_Channel = pubsub:account_channel(Account_Token),
+    pubsub:unsubscribe(Account_Channel, self()),
+    ok.
 
 -spec init({atom(), http}, Req, _) -> {loop | shutdown, Req, undefined | #state{}}.
 init({_Any, http}, Req, _Opts) ->
