@@ -10,21 +10,21 @@
          code_change/3,
          start_link/0]).
 
+-include("inspector.hrl").
+
 -record(state, {
-        socket :: pid(),
+        socket :: port(),
         server :: atom(),
         channels = [] :: list()
     }).
 
 -record(request_metadata, {
         type :: atom(),
-        account :: binary(),
+        account :: binary() | #account{},
         timestamp :: non_neg_integer()
     }).
 
--include("inspector.hrl").
-
--spec start_link() -> ok.
+-spec start_link() -> 'ignore' | {'error',_} | {'ok',pid()}.
 start_link() -> gen_server:start_link(?MODULE, [], []).
 
 -spec init(_) -> {ok, #state{}}.

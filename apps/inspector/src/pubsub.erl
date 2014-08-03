@@ -38,7 +38,7 @@
 -spec safe_create_channel(channel()) -> ok.
 -spec subscribe(channel(), pid()) -> ok.
 -spec unsubscribe(channel(), pid()) -> ok.
--spec account_channel(string()) -> binary().
+-spec account_channel(string()) -> atom().
 -spec listeners(string()) -> [any()].
 
 publish(Channel, Message) -> gen_server:cast(?MODULE, {publish, Channel, Message}).
@@ -96,7 +96,7 @@ init([]) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
--spec handle_call(term(), pid(), term()) -> {reply, ok, #state{}}.
+-spec handle_call(term(), {pid(),_}, term()) -> {reply, ok, #state{}}.
 
 handle_call({listeners, Tab}, _From, State) ->
     Reply = case ets:info(Tab) of
@@ -212,4 +212,4 @@ broadcast(Channel, Message, Listeners) ->
 channel_name(Channel) ->
     list_to_atom("pubsub_"++atom_to_list(Channel)).
 
-account_channel(Account) -> list_to_atom(binary_to_list(iolist_to_binary([<<"traffic">>, $_, Account]))).
+account_channel(Account) when is_list(Account) -> list_to_atom("traffic" ++ [$_] ++ Account).

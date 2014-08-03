@@ -12,12 +12,25 @@ clean:
 clean_logs:
 	rm -rf log*
 
-build_plt: erl
-	dialyzer --verbose --build_plt --apps kernel stdlib erts compiler hipe crypto \
-		edoc gs syntax_tools --output_plt ~/.inspector.plt -pa deps/*/ebin ebin
+DEPSOLVER_PLT=$(CURDIR)/.depsolver_plt
 
-analyze: erl
-	dialyzer --verbose -pa deps/*/ebin --plt ~/.inspector.plt -Werror_handling ebin
+.PHONY: dialyzer typer clean distclean
+
+$(DEPSOLVER_PLT):
+	dialyzer --output_plt $(DEPSOLVER_PLT) --build_plt \
+		--apps erts kernel stdlib erts compiler stntax_tools crypto public_key -r deps
+
+# -Wunderspecs \
+
+dialyzer: $(DEPSOLVER_PLT)
+	dialyzer --verbose --plt $(DEPSOLVER_PLT) -I apps/inspector/include \
+		-Werror_handling -Wrace_conditions -Wno_undefined_callbacks \
+		apps/inspector/ebin | \
+		fgrep -v -f ./dialyzer.ignore-warnings
+
+typer: $(DEPSOLVER_PLT)
+	typer --plt $(DEPSOLVER_PLT) -I apps/inspector/include -r apps/inspector/src -pa deps/lager/ebin
+
 
 xref: all
 	rebar skip_deps=true xref

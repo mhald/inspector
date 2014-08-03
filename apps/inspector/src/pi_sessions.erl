@@ -17,6 +17,8 @@
          terminate/2,
          code_change/3]).
 
+-include("inspector.hrl").
+
 -record(state, {
         ets :: integer()
     }).
@@ -37,7 +39,7 @@ update(Action, Server, Sessions) -> gen_server:cast(?MODULE, {update, Action, Se
 add(Server, Accounts) -> gen_server:cast(?MODULE, {add, Server, Accounts}).
 remove(Server, Accounts) -> gen_server:cast(?MODULE, {remove, Server, Accounts}).
 
--spec get_sessions() -> [binary()].
+-spec get_sessions() -> [#account{}].
 get_sessions() -> gen_server:call(?MODULE, {get_sessions}).
 
 %%--------------------------------------------------------------------
@@ -47,7 +49,7 @@ get_sessions() -> gen_server:call(?MODULE, {get_sessions}).
 %% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
--spec start_link() -> ok.
+-spec start_link() -> 'ignore' | {'error',_} | {'ok',pid()}.
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 

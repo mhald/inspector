@@ -14,7 +14,7 @@
 -export([sock_opts/0,
          new_connection/4]).
 
--spec start_link() -> ok.
+-spec start_link() -> 'ignore' | {'error',_} | {'ok',pid()}.
 start_link() -> gen_nb_server:start_link(?MODULE, []).
 
 -spec init(_, _) -> {ok, any()}. %% TODO: fix any

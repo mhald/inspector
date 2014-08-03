@@ -1,0 +1,4 @@
+### meck:code_cover.erl has to call this unexported functions to do its
+### cover passthrough magic:
+pi_listener.erl:4: Callback info about the gen_nb_server behaviour is not available
+pi_listener.erl:18: Function start_link/0 has no local return

@@ -28,7 +28,7 @@
     ]).
 
 -record(state, {
-        socket :: pid(),
+        socket :: port(),
         host :: string(),
         port :: integer(),
         sessions = [] :: list(),
@@ -39,7 +39,7 @@
 
 -define(IS_TRACING_ON, true).
 
--spec start_link([any()]) -> ok.
+-spec start_link([any()]) -> 'ignore' | {'error',_} | {'ok',pid()}.
 start_link(Params) -> gen_fsm:start_link({local, ?MODULE}, ?MODULE, Params, []).
 
 -type account() :: string().
@@ -88,7 +88,7 @@ add_sessions(Accounts) -> gen_fsm:send_event(?MODULE, {add_sessions, Accounts}).
 -spec remove_sessions([userid()]) -> ok.
 remove_sessions(Accounts) -> gen_fsm:send_event(?MODULE, {remove_sessions, Accounts}).
 
--spec init([any()]) -> {ok, #state{}}.
+-spec init([any()]) ->  {'ok','disconnected',#state{}}.
 init(Params) ->
     %% TODO: exit with error if they parameters are not given
     {Mod, Fun} = proplists:get_value(account_info_callback, Params),
@@ -164,10 +164,8 @@ encode(Other) ->
 avatar(undefined) -> [];
 avatar(Link) -> {<<"avatar">>, as_binary(Link)}.
 
--spec connected(Request::term(), State::term()) ->
-    {next_state, NextStateName::atom(), NewState::term()} |
-    {stop, Reason::term(), NewState::term()}.
-connected({send_packet, Account, Encoding, Sender, Reciever, Text}, #state{socket=Socket, queue=[]} = State) ->
+-spec connected(Request::term(),#state{}) -> {'next_state',NextStateName::atom(),#state{}} | {'stop',Reason::term(),#state{}}.
+connected({send_packet, Account, Encoding, _Sender, _Reciever, Text}, #state{socket=Socket, queue=[]} = State) ->
     Json = standard_pi_account_packet(<<"data_packet">>, Account, [
             {<<"direction">>, <<"sent">>},
             {<<"encoding">>, Encoding},
@@ -238,6 +236,8 @@ disconnected({send_packet, Account, Encoding, Text}, State) -> connect_and_proce
 disconnected({receive_packet, Account, Encoding, Text}, State) -> connect_and_process({received_packet, Account, Encoding, Text}, State);
 disconnected({add_sessions, Text}, State) -> connect_and_process({pi_packet, Text}, State);
 disconnected({remove_sessions, Text}, State) -> connect_and_process({pi_packet, Text}, State);
+disconnected({http_response, Account, Url, Code, Headers, Body} = Request, State) -> connect_and_process(Request, State);
+disconnected({http_request, Account, Url, Headers, Parameters} = Request, State) -> connect_and_process(Request, State);
 disconnected(Other, State) ->
     lager:debug("Unknown request when disconnected ~p", [Other]),
     {next_state, disconnected, State}.
@@ -251,7 +251,7 @@ loop_until_connected(State) ->
         {ok, Socket} -> {ok, Socket};
         {error, Error} ->
             lager:warning("Cannot connect to socket ~p", [Error]),
-            erlang:sleep(1000),
+            timer:sleep(1000),
             loop_until_connected(State)
     end.
 
@@ -275,16 +275,13 @@ handle_info(Msg, _State_Name, State) ->
     lager:info("Shutting down on unrequested handle_info ~p", [Msg]),
     {stop, shutdown, State}.
 
--spec handle_event(Msg::term(), StateName::atom(), StateData::term()) ->
-    {next_state, NewStateName::atom(), NewStateData::term()} |
-    {next_state, NewStateName::atom(), NewStateData::term(), Timeout::integer()} |
-    {stop, Reason::atom(), Reply::term(), NewStateData::term()} |
-    {stop, Reason::atom(), NewStateData::term()}.
+-spec handle_event(Msg::term(),StateName::atom(),#state{}) ->
+     {'next_state',atom(),_} | {'stop',_,_} | {'next_state',atom(),_,'hibernate' | 'infinity' | non_neg_integer()}.
 handle_event(Msg, _State_Name, State_Data) ->
     lager:info("Shutting down on unrequested handle_event ~p", [Msg]),
     {stop, shutdown, State_Data}.
 
--spec handle_sync_event(Msg::term(), From::pid(), StateName::atom(), StateData::term()) ->
+-spec handle_sync_event(Msg::term(), From::{pid(),_}, StateName::atom(), StateData::term()) ->
     {next_state, NewStateName::atom(), NewStateData::term()} |
     {reply, Reply::term(), NewStateName::atom(), NewStateData::term()} |
     {stop, Reason::atom(), NewStateData::term()}.
@@ -296,7 +293,7 @@ handle_sync_event(Msg, _From, _StateName, StateData) ->
 terminate(_Reason, _State_Name, _State) -> ok. 
 
 -spec code_change(OldVsn::(term() | {down, term()}), State_Name::atom(), State::term(), Extra::term()) ->
-    {ok, State_Name::atom(), NewState::term()} | {error, State_Name::atom(), Reason::term()}.
+    {ok, State_Name::atom(), NewState::term()} | {'ok',atom(),_Reason}.
 code_change(_OldVersion, State_Name, State, _Extra) -> {ok, State_Name, State}.
 
 proplist_to_json(Proplist) ->
@@ -306,7 +303,7 @@ as_binary(Val) when is_binary(Val) -> Val;
 as_binary(Val) when is_list(Val) -> list_to_binary(Val);
 as_binary(Val) when is_atom(Val) -> list_to_binary(atom_to_list(Val)).
 
--spec now_for_timestamp() -> string().
+-spec now_for_timestamp() -> non_neg_integer().
 now_for_timestamp() ->
     {MegaSecs,Secs,MicroSecs} = now(),
     (MegaSecs*1000000 + Secs)*1000000 + MicroSecs.

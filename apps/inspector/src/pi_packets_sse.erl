@@ -43,7 +43,7 @@ init({_Any, http}, Req, _Opts) ->
                      Headers = [{'Content-Type', <<"text/event-stream">>}, {<<"Access-Control-Allow-Origin">>, <<"*">>}],
                      State =  #state{account_token = binary_to_list(Account_Token), handler_pid=self()},
                      {ok, Req3} = cowboy_http_req:chunked_reply(?HTTP_OK, Headers, Req2),
-                     Account_Channel = pubsub:account_channel(Account_Token),
+                     Account_Channel = pubsub:account_channel(binary_to_list(Account_Token)),
                      send_recent_traffic(Req3, Account_Token),
                      pubsub:safe_create_channel(Account_Channel),
                      pubsub:subscribe(Account_Channel, self()),
@@ -63,7 +63,10 @@ send_recent_traffic(Req, Current_User) ->
     [begin
                 cowboy_http_req:chunk(["event: event-history\n"], Req),
                 cowboy_http_req:chunk(["data:", Data, "\n\n"], Req)
-        end || #history{data=Data, account=#account{token=Account_Token}} <- ets_buffer:history(history, ?MAX_RECENT_TRAFFIC_RECORDS), Account_Token =:= Current_User].
+        end || #history{data=Data, account=#account{token=Account_Token}} <- ets_buffer:history(history, ?MAX_RECENT_TRAFFIC_RECORDS), same_account(Account_Token, Current_User)].
+
+same_account(undefined,_) -> false;
+same_account(Account_String, Account_Binary) -> list_to_binary(Account_String) =:= Account_Binary.
 
 -spec handle(Req, #state{}) -> {shutdown, Req, #state{}}.
 handle(Req, State) -> {shutdown, Req, State}.

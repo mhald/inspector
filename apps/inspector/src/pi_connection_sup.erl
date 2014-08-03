@@ -24,7 +24,7 @@ start_connection() ->
 %% Supervisor callbacks
 %% ===================================================================
 
--spec init({}) -> any(). %% TODO add right return type
+-spec init({}) -> 'ignore' | {'ok',{{'one_for_all',non_neg_integer(),non_neg_integer()} | {'one_for_one',non_neg_integer(),non_neg_integer()} | {'rest_for_one',non_neg_integer(),non_neg_integer()} | {'simple_one_for_one',non_neg_integer(),non_neg_integer()},[{_,{atom() | tuple(),atom(),'undefined' | [any()]},'permanent' | 'temporary' | 'transient','brutal_kill' | 'infinity' | non_neg_integer(),'supervisor' | 'worker','dynamic' | [atom() | tuple()]}]}}.
 init({}) ->
     lager:debug("Starting pi_connection_sup listener"),
     {ok, {{simple_one_for_one, 5, 60},
